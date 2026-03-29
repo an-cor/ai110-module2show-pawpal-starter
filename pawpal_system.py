@@ -24,10 +24,9 @@ class Task:
         return self.frequency != "once"
 
     def next_occurrence(self) -> Optional["Task"]:
-        """Returns a new Task scheduled for the next occurrence, or None if frequency is 'once'.
-
-        - 'daily'  → tomorrow (current date + 1 day)
-        - 'weekly' → same day next week (current date + 7 days)
+        """Returns a copy of this task scheduled for its next due date, or None if frequency is 'once'.
+        Daily tasks advance by 1 day; weekly tasks advance by 7 days.
+        The new task is unmarked (completed=False) and preserves all other fields.
         """
         if self.frequency == "once":
             return None
@@ -117,8 +116,15 @@ class Scheduler:
         return self.sort_tasks_by_time(all_tasks)
 
     def sort_tasks_by_time(self, tasks: List[Task]) -> List[Task]:
-        """Sorts a list of tasks in ascending order by their 'HH:MM' time string."""
-        return sorted(tasks, key=lambda t: t.time)
+        """Sorts tasks by 'HH:MM' time string (ascending).
+        Tasks at the same time are ordered by priority: high first, then medium, then low.
+        Any unrecognized priority value is placed last."""
+        priority_order = {"high": 0, "medium": 1, "low": 2}
+
+        def sort_key(task: Task):
+            return (task.time, priority_order.get(task.priority, 99))
+
+        return sorted(tasks, key=sort_key)
 
     def filter_tasks(
         self,
@@ -126,10 +132,9 @@ class Scheduler:
         completed: Optional[bool] = None,
         pet_name: Optional[str] = None,
     ) -> List[Task]:
-        """Filters tasks by completion status and/or pet name.
-
-        Note: pet_name filtering works because Owner.get_all_tasks() stamps
-        each task with its pet's name in the task.pet_name field.
+        """Returns a subset of tasks matching the given filters.
+        Pass completed=True/False to filter by status, or pet_name to filter by pet.
+        Both filters can be applied together; omitting a filter skips that check.
         """
         result = tasks
         if completed is not None:
@@ -139,10 +144,9 @@ class Scheduler:
         return result
 
     def detect_conflicts(self, tasks: List[Task]) -> List[str]:
-        """Returns a warning for every pair of tasks whose time windows overlap.
-
+        """Checks every pair of tasks for overlapping time windows.
         Two tasks conflict when one starts before the other finishes.
-        Back-to-back tasks (one ends exactly when the next starts) are fine.
+        Returns a list of warning strings — empty if no conflicts exist.
         """
         def to_minutes(time_str: str) -> int:
             """Convert 'HH:MM' to total minutes since midnight."""

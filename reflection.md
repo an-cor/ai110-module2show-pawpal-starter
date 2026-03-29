@@ -49,54 +49,6 @@ I made this because I noticed that complexity was a lot higher by having the nam
 **Scheduler**
 - methods: build_daily_schedule(), sort_tasks_by_time(), filter_tasks(), detect_conflicts(), explain_schedule()
 
-
-**UML representation of code**
-
-classDiagram
-    class Owner {
-        +str name
-        +dict preferences
-        +list pets
-        +add_pet(pet)
-        +get_pet(name)
-        +get_all_tasks()
-    }
-
-    class Pet {
-        +str name
-        +str species
-        +int age
-        +str notes
-        +list tasks
-        +add_task(task)
-        +remove_task(task_title)
-        +get_tasks()
-    }
-
-    class Task {
-        +str title
-        +int duration_minutes
-        +str priority
-        +str time
-        +str frequency
-        +bool completed
-        +mark_complete()
-        +is_recurring()
-    }
-
-    class Scheduler {
-        +build_daily_schedule(owner)
-        +sort_tasks_by_time(tasks)
-        +filter_tasks(tasks, completed, pet_name)
-        +detect_conflicts(tasks)
-        +explain_schedule(tasks)
-    }
-
-    Owner "1" --> "*" Pet : has
-    Pet "1" --> "*" Task : has
-    Scheduler --> Owner : reads from
-    Scheduler --> Task : organizes
-
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
@@ -163,18 +115,26 @@ I scanned the code to make sure the logic made sense for this project. I checked
 
 This is what I tested
 - add a name for user
-- add a pet add 
-- a second pet 
-- add tasks to both pets 
+- add a pet with name
+- add a second pet 
+- add different kinds of pets
+- add tasks to multiple pets 
 - click generate schedule 
-- confirm the schedule and conflict warning appear
+- confirm the schedule 
+- confirm conflict warning appears
 
 - Why were these tests important?
+
+These tests are important because it is what is expected for the tool to be used for. These behaviors mask the original three core actions a user should be able to perform of what was discussined in section 1 (system design). Without being able to do this, a user would not have their needs met using this tool.
 
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
+
+Condence 4/5
+
 - What edge cases would you test next if you had more time?
+
 
 ---
 
