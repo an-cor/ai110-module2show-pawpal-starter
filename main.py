@@ -1,101 +1,117 @@
 from pawpal_system import Task, Pet, Owner, Scheduler
 
 
-def print_schedule(tasks):
-    """Prints the daily schedule in a readable format."""
-    WIDTH = 50
-    print()
-    print("=" * WIDTH)
-    print("PAWPAL+  —  TODAY'S SCHEDULE".center(WIDTH))
-    print("=" * WIDTH)
-
+def print_tasks(tasks, label=""):
+    if label:
+        print(f"\n{label}")
     if not tasks:
-        print("  No tasks scheduled for today.")
-        print("=" * WIDTH)
+        print("  (none)")
         return
-
-    for task in tasks:
-        status  = "DONE" if task.completed else "TODO"
-        repeat  = f"repeats {task.frequency}" if task.is_recurring() else "one-time"
-        pet     = task.pet_name or "Unknown"
-
-        print(f"  {task.time}   {task.title}")
-        print(f"         Pet      : {pet}")
-        print(f"         Duration : {task.duration_minutes} min")
-        print(f"         Priority : {task.priority}")
-        print(f"         Repeat   : {repeat}")
-        print(f"         Status   : {status}")
-        print("-" * WIDTH)
-
-    print()
+    for t in tasks:
+        status = "DONE" if t.completed else "TODO"
+        recur = f"repeats {t.frequency}" if t.is_recurring() else "once"
+        print(f"  {t.time}  [{status}]  {t.title}  ({t.pet_name}, {recur}, date: {t.date})")
 
 
 def main():
-    """Sets up sample data, builds a schedule, and prints it."""
+    scheduler = Scheduler()
 
-    # --- Create owner ---
+    # ------------------------------------------------------------------ #
+    # Setup
+    # ------------------------------------------------------------------ #
     owner = Owner(name="Alex")
 
-    # --- Create pets ---
     mochi = Pet(name="Mochi", species="Dog", age=3)
-    luna = Pet(name="Luna", species="Cat", age=5, notes="Shy around strangers")
+    luna  = Pet(name="Luna",  species="Cat", age=5)
 
-    # --- Add tasks to Mochi ---
-    mochi.add_task(Task(
-        title="Morning Walk",
-        duration_minutes=30,
-        priority="high",
-        time="07:30",
-        frequency="daily",
-    ))
-    mochi.add_task(Task(
-        title="Feed Breakfast",
-        duration_minutes=10,
-        priority="high",
-        time="08:00",
-    ))
+    # Tasks added deliberately out of chronological order
+    mochi.add_task(Task(title="Evening Walk",    duration_minutes=30, priority="medium", time="18:00", frequency="daily", date="2026-03-29"))
+    mochi.add_task(Task(title="Morning Walk",    duration_minutes=30, priority="high",   time="07:30", frequency="daily", date="2026-03-29"))
+    mochi.add_task(Task(title="Midday Check",    duration_minutes=10, priority="low",    time="12:00",                    date="2026-03-29"))
 
-    # --- Add tasks to Luna ---
-    luna.add_task(Task(
-        title="Feed Breakfast",
-        duration_minutes=5,
-        priority="high",
-        time="08:00",
-    ))
-    luna.add_task(Task(
-        title="Clean Litter Box",
-        duration_minutes=10,
-        priority="medium",
-        time="09:30",
-        frequency="daily",
-    ))
-    luna.add_task(Task(
-        title="Vet Appointment",
-        duration_minutes=60,
-        priority="high",
-        time="14:00",
-        frequency="once",
-    ))
+    luna.add_task(Task(title="Feed Breakfast",   duration_minutes=5,  priority="high",   time="08:00",                    date="2026-03-29"))
+    luna.add_task(Task(title="Vet Appointment",  duration_minutes=60, priority="high",   time="07:45", frequency="once",  date="2026-03-29"))
+    luna.add_task(Task(title="Clean Litter",     duration_minutes=10, priority="medium", time="09:30", frequency="daily", date="2026-03-29"))
 
-    # --- Register pets with owner ---
     owner.add_pet(mochi)
     owner.add_pet(luna)
 
-    # --- Build schedule ---
-    scheduler = Scheduler()
+    # ------------------------------------------------------------------ #
+    # 1. Sorting
+    # ------------------------------------------------------------------ #
+    print("\n" + "=" * 55)
+    print("1. SORTING — tasks printed in time order")
+    print("=" * 55)
+    print("   (added order: Evening Walk, Morning Walk, Midday Check,")
+    print("    Feed Breakfast, Vet Appointment, Clean Litter)")
+
     schedule = scheduler.build_daily_schedule(owner)
+    print_tasks(schedule, "Sorted schedule:")
 
-    # --- Print schedule ---
-    print_schedule(schedule)
+    # ------------------------------------------------------------------ #
+    # 2. Conflict detection  (run before any completions to keep it clean)
+    # ------------------------------------------------------------------ #
+    print("\n" + "=" * 55)
+    print("2. CONFLICT DETECTION")
+    print("=" * 55)
+    print("   Morning Walk   07:30–08:00  (Mochi, 30 min)")
+    print("   Vet Appointment 07:45–08:45  (Luna, 60 min)  ← overlaps Morning Walk")
+    print("   Vet Appointment 07:45–08:45  (Luna, 60 min)  ← also overlaps Feed Breakfast at 08:00")
 
-    # --- Conflict check ---
     conflicts = scheduler.detect_conflicts(schedule)
+    print()
     if conflicts:
-        print("  CONFLICTS DETECTED:")
         for warning in conflicts:
             print(f"  !! {warning}")
-        print("=" * 50)
-        print()
+    else:
+        print("  No conflicts found.")
+
+    # ------------------------------------------------------------------ #
+    # 3. Filtering
+    # ------------------------------------------------------------------ #
+    print("\n" + "=" * 55)
+    print("3. FILTERING")
+    print("=" * 55)
+
+    # Mark one task done so status filtering is interesting
+    mochi.complete_task("Morning Walk")
+
+    all_tasks = scheduler.build_daily_schedule(owner)
+
+    print_tasks(
+        scheduler.filter_tasks(all_tasks, pet_name="Mochi"),
+        "Filter by pet — Mochi only:",
+    )
+    print_tasks(
+        scheduler.filter_tasks(all_tasks, pet_name="Luna"),
+        "Filter by pet — Luna only:",
+    )
+    print_tasks(
+        scheduler.filter_tasks(all_tasks, completed=True),
+        "Filter by status — completed:",
+    )
+    print_tasks(
+        scheduler.filter_tasks(all_tasks, completed=False, pet_name="Mochi"),
+        "Filter by status + pet — Mochi, pending only:",
+    )
+
+    # ------------------------------------------------------------------ #
+    # 4. Recurring tasks
+    # ------------------------------------------------------------------ #
+    print("\n" + "=" * 55)
+    print("4. RECURRING TASKS")
+    print("=" * 55)
+
+    print("\nBefore completing 'Clean Litter' (daily):")
+    print_tasks(luna.get_tasks())
+
+    luna.complete_task("Clean Litter")
+
+    print("\nAfter completing 'Clean Litter':")
+    print("  → original marked DONE, next occurrence auto-created for 2026-03-30")
+    print_tasks(luna.get_tasks())
+
+    print()
 
 
 if __name__ == "__main__":

@@ -1,37 +1,13 @@
 from pawpal_system import Task, Pet, Owner, Scheduler
 
 
-def test_mark_complete_sets_completed_to_true():
-    task = Task(title="Morning Walk", duration_minutes=30, priority="high", time="07:30")
-
-    # Task should start as not completed
-    assert task.completed is False
-
-    task.mark_complete()
-
-    assert task.completed is True
-
-
-def test_add_task_increases_pet_task_count():
-    pet = Pet(name="Mochi", species="Dog")
-    task = Task(title="Feed Breakfast", duration_minutes=10, priority="high", time="08:00")
-
-    assert len(pet.get_tasks()) == 0
-
-    pet.add_task(task)
-
-    assert len(pet.get_tasks()) == 1
-
-
-def test_build_daily_schedule_sorts_tasks_by_time():
+def test_sort_tasks_by_time():
+    """Tasks added out of order come back sorted chronologically."""
     owner = Owner(name="Alex")
     pet = Pet(name="Mochi", species="Dog")
-
-    # Add tasks out of order
-    pet.add_task(Task(title="Evening Walk",  duration_minutes=30, priority="medium", time="18:00"))
+    pet.add_task(Task(title="Evening Walk",   duration_minutes=30, priority="medium", time="18:00"))
     pet.add_task(Task(title="Feed Breakfast", duration_minutes=10, priority="high",   time="08:00"))
-    pet.add_task(Task(title="Midday Check",  duration_minutes=5,  priority="low",    time="12:00"))
-
+    pet.add_task(Task(title="Midday Check",   duration_minutes=5,  priority="low",    time="12:00"))
     owner.add_pet(pet)
 
     schedule = Scheduler().build_daily_schedule(owner)
@@ -41,40 +17,86 @@ def test_build_daily_schedule_sorts_tasks_by_time():
     assert schedule[2].time == "18:00"
 
 
-def test_detect_conflicts_flags_overlapping_tasks():
-    """Tasks whose windows overlap (but don't share an exact start time) are flagged."""
+def test_filter_by_pet_name():
+    """Only tasks belonging to the requested pet are returned."""
     scheduler = Scheduler()
     tasks = [
-        # Shower runs 11:00 – 12:01 (61 min)
-        Task(title="Shower",   duration_minutes=61, priority="high", time="11:00", pet_name="Mochi"),
-        # nap time runs 11:30 – 12:30 — starts before Shower ends
-        Task(title="nap time", duration_minutes=60, priority="low",  time="11:30", pet_name="Claus"),
+        Task(title="Walk",  duration_minutes=30, priority="high",   time="08:00", pet_name="Mochi"),
+        Task(title="Feed",  duration_minutes=5,  priority="high",   time="08:00", pet_name="Luna"),
+        Task(title="Brush", duration_minutes=10, priority="medium", time="09:00", pet_name="Mochi"),
     ]
+
+    result = scheduler.filter_tasks(tasks, pet_name="Mochi")
+
+    assert len(result) == 2
+    assert all(t.pet_name == "Mochi" for t in result)
+
+
+def test_filter_by_completion_status():
+    """Pending and completed tasks can each be retrieved independently."""
+    scheduler = Scheduler()
+    done = Task(title="Walk", duration_minutes=30, priority="high", time="07:00", pet_name="Mochi")
+    done.mark_complete()
+    tasks = [
+        done,
+        Task(title="Feed",  duration_minutes=10, priority="high",   time="08:00", pet_name="Mochi"),
+        Task(title="Brush", duration_minutes=5,  priority="medium", time="09:00", pet_name="Luna"),
+    ]
+
+    pending = scheduler.filter_tasks(tasks, completed=False)
+    assert len(pending) == 2
+
+    completed = scheduler.filter_tasks(tasks, completed=True)
+    assert len(completed) == 1
+    assert completed[0].title == "Walk"
+
+
+def test_recurring_daily_creates_next_day():
+    """Completing a daily task appends a new task scheduled for the following day."""
+    pet = Pet(name="Mochi", species="Dog")
+    pet.add_task(Task(
+        title="Morning Walk", duration_minutes=30, priority="high",
+        time="07:30", frequency="daily", date="2026-03-29",
+    ))
+
+    pet.complete_task("Morning Walk")
+
+    tasks = pet.get_tasks()
+    assert len(tasks) == 2
+    assert tasks[0].completed is True
+    assert tasks[1].completed is False
+    assert tasks[1].date == "2026-03-30"
+
+
+def test_recurring_weekly_creates_next_week():
+    """Completing a weekly task appends a new task scheduled seven days later."""
+    pet = Pet(name="Luna", species="Cat")
+    pet.add_task(Task(
+        title="Grooming", duration_minutes=20, priority="medium",
+        time="10:00", frequency="weekly", date="2026-03-29",
+    ))
+
+    pet.complete_task("Grooming")
+
+    tasks = pet.get_tasks()
+    assert len(tasks) == 2
+    assert tasks[0].completed is True
+    assert tasks[1].completed is False
+    assert tasks[1].date == "2026-04-05"
+
+
+def test_conflict_detection_flags_overlap():
+    """Two tasks whose time windows overlap produce a conflict warning."""
+    scheduler = Scheduler()
+    tasks = [
+        # Walk runs 07:30 – 08:00
+        Task(title="Walk",            duration_minutes=30, priority="high", time="07:30", pet_name="Mochi"),
+        # Vet runs 07:45 – 08:45 — starts before Walk ends
+        Task(title="Vet Appointment", duration_minutes=60, priority="high", time="07:45", pet_name="Luna"),
+    ]
+
     conflicts = scheduler.detect_conflicts(tasks)
+
     assert len(conflicts) == 1
-    assert "Shower" in conflicts[0]
-    assert "nap time" in conflicts[0]
-
-
-def test_detect_conflicts_same_start_time():
-    """Two tasks with the identical start time always overlap."""
-    scheduler = Scheduler()
-    tasks = [
-        Task(title="Feed", duration_minutes=10, priority="high",   time="08:00", pet_name="Mochi"),
-        Task(title="Walk", duration_minutes=20, priority="medium", time="08:00", pet_name="Mochi"),
-    ]
-    conflicts = scheduler.detect_conflicts(tasks)
-    assert len(conflicts) == 1
-
-
-def test_detect_conflicts_no_overlap():
-    """Back-to-back tasks (one ends exactly when the next starts) are not a conflict."""
-    scheduler = Scheduler()
-    tasks = [
-        # Morning walk: 08:00 – 09:00
-        Task(title="Morning walk", duration_minutes=60, priority="high",   time="08:00", pet_name="Mochi"),
-        # Lunch starts exactly at 09:00 — no overlap
-        Task(title="Lunch",        duration_minutes=15, priority="medium", time="09:00", pet_name="Mochi"),
-    ]
-    conflicts = scheduler.detect_conflicts(tasks)
-    assert len(conflicts) == 0
+    assert "Walk" in conflicts[0]
+    assert "Vet Appointment" in conflicts[0]

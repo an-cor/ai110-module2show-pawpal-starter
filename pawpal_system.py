@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from typing import List, Optional
 
 
@@ -12,6 +13,7 @@ class Task:
     frequency: str = "once"
     completed: bool = False
     pet_name: str = ""  # set when collected from an Owner; useful for filtering
+    date: str = field(default_factory=lambda: date.today().isoformat())
 
     def mark_complete(self) -> None:
         """Sets the task as completed."""
@@ -20,6 +22,31 @@ class Task:
     def is_recurring(self) -> bool:
         """Returns True if this task repeats (i.e. frequency is not 'once')."""
         return self.frequency != "once"
+
+    def next_occurrence(self) -> Optional["Task"]:
+        """Returns a new Task scheduled for the next occurrence, or None if frequency is 'once'.
+
+        - 'daily'  → tomorrow (current date + 1 day)
+        - 'weekly' → same day next week (current date + 7 days)
+        """
+        if self.frequency == "once":
+            return None
+        current = date.fromisoformat(self.date)
+        if self.frequency == "daily":
+            next_date = current + timedelta(days=1)
+        elif self.frequency == "weekly":
+            next_date = current + timedelta(weeks=1)
+        else:
+            return None
+        return Task(
+            title=self.title,
+            duration_minutes=self.duration_minutes,
+            priority=self.priority,
+            time=self.time,
+            frequency=self.frequency,
+            pet_name=self.pet_name,
+            date=next_date.isoformat(),
+        )
 
 
 @dataclass
@@ -35,6 +62,16 @@ class Pet:
         """Adds a task to this pet's task list and records which pet owns it."""
         task.pet_name = self.name
         self.tasks.append(task)
+
+    def complete_task(self, task_title: str) -> None:
+        """Marks a task complete. If it recurs, appends the next occurrence to this pet's tasks."""
+        for task in self.tasks:
+            if task.title == task_title and not task.completed:
+                task.mark_complete()
+                next_task = task.next_occurrence()
+                if next_task is not None:
+                    self.add_task(next_task)
+                return
 
     def remove_task(self, task_title: str) -> None:
         """Removes the first task whose title matches the given string."""

@@ -135,13 +135,23 @@ The simplicity is the trade off. A more understable scheduler adds complexity to
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
+- How did you use AI tools during this project?
+
+I use Claude to help me design brainstorming in the UML class system, debugging after testing and running the code, then refactoring the code after bugs are found with the logic. 
+
 - What kinds of prompts or questions were most helpful?
+
+It was helpful to isolate the logic behind testing implementations. Understanding how the code is being tested by the model helped me understand the core code itself and what I am supposed to be on the look out. I used the code logic in tests/* to make sure that the UI matched the same logic. 
 
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
+
+The AI suggestion to display information "as-is" for a task in the scheduler without naming the actual pet. Only the tasks, time and priority were mentioned when the owner had one pet but never mentioend the pet. I did not like this because this creates gaps of logic regarding what the pet being taken cared for is. The name of the pet should be a constant part of a user interacting with the tool. 
+
 - How did you evaluate or verify what the AI suggested?
+
+I scanned the code to make sure the logic made sense for this project. I checked that the pytests were actually calling the other functions and running the code plus comparing it some expected output. Made sure the expected output was correct by running the commands on my terminal constantly through iterations. Made sure to check UI logic after backend implementation kept getting more and more complex. 
 
 ---
 
@@ -150,6 +160,15 @@ The simplicity is the trade off. A more understable scheduler adds complexity to
 **a. What you tested**
 
 - What behaviors did you test?
+
+This is what I tested
+- add a name for user
+- add a pet add 
+- a second pet 
+- add tasks to both pets 
+- click generate schedule 
+- confirm the schedule and conflict warning appear
+
 - Why were these tests important?
 
 **b. Confidence**
